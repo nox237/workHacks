@@ -1,0 +1,4 @@
+prettytable==2.2.0
+PyPDF2==1.26.0
+termcolor==1.1.0
+wcwidth==0.2.5
