@@ -51,10 +51,12 @@ def get_vulnerability_data(list_heading):
             if ip in text_vulnerability:
                 vulnerability_ip_list.append(ip)
         vulnerability_object['ip'] = vulnerability_ip_list
-        
-        problem = re.findall(r"\/(tcp|udp)([\d\w\s\-\.]+)\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", text_vulnerability)
+
+        vulnerability_object['problem'] = {}
+        for ip in vulnerability_object['ip']:
+            vulnerability_object['problem'][ip] = list(re.findall(ip + r"(\d{1,5}\/tcp|udp)", text_vulnerability))
+
         solution = re.findall(r"Solution(.+)", text_vulnerability)
-        vulnerability_object['problem'] = problem
         vulnerability_object['solution'] = solution[0].strip()
 
         if re.match(r".*Page \d+CONFIDENTIAL", solution[0]):
@@ -122,11 +124,21 @@ if __name__ == "__main__":
     list_vulnerability = get_vulnerability_data(list_heading)
     
     x = PrettyTable()
-    x.field_names = ['Vulnerability Name', 'Severity', 'CVSS v3', 'CVSS v2']
+    x.field_names = ['Vulnerability Name', 'IP', 'Port', 'Severity', 'CVSS v3', 'CVSS v2']
     x.align['Vulnerability Name'] = "l"
+
     print('[!] Printing all vulnerability')
+
+    total_len = 0
     for vulnerability in list_vulnerability:
-        x.add_row([vulnerability['title'], vulnerability['severity'], vulnerability['cvss_v3'], vulnerability['cvss_v2']])
+        x.add_row([vulnerability['title'], '', '', vulnerability['severity'], vulnerability['cvss_v3'], vulnerability['cvss_v2']])
+        total_len += 1
+        for ip in vulnerability['problem']:
+            for port in vulnerability['problem'][ip]:
+                x.add_row(['', ip, port, '', '', ''])
+                total_len += 1
+            
+        
     print(x)
     print()
 
@@ -168,3 +180,41 @@ if __name__ == "__main__":
         print(x)
     else:
         print('[!] There is no ip supplied')
+    
+    if output_path != '':
+        import docx
+        import datetime
+        ress = re.findall(r'(\d{8})\_(\w+)', pdf_path)[0]
+        filename = ress[1]
+        date = ress[0]
+        print(date, filename)
+
+        save_doc = docx.Document()
+        table = save_doc.add_table(rows=1, cols=6)
+        row = table.rows[0].cells
+        row[0].text = 'Vulnerability Name'
+        row[1].text = 'IP'
+        row[2].text = 'Port'
+        row[3].text = 'Severity'
+        row[4].text = 'CVSS v3'
+        row[5].text = 'CVSS v2'
+
+        for vuln in list_vulnerability:
+            row = table.add_row().cells
+            row[0].text = vuln['title']
+            row[1].text = ''
+            row[2].text = ''
+            row[3].text = vuln['severity']
+            row[4].text = str(vuln['cvss_v3'])
+            row[5].text = str(vuln['cvss_v2'])
+            for ip in vuln['problem']:
+                for port in vuln['problem'][ip]:
+                    row = table.add_row().cells
+                    row[0].text = ''
+                    row[1].text = ip
+                    row[2].text = port
+                    row[3].text = ''
+                    row[4].text = ''
+                    row[5].text = ''
+        
+        save_doc.save(output_path + '/' + date + '_' + filename + '.docx')
